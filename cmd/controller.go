@@ -36,7 +36,14 @@ func init() {
 }
 
 func controllerStatus(cmd *cobra.Command, args []string) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(timeout))
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
 	defer cancel()
 
 	resp, err := c.GetStatus(ctx, &pbc.GetStatusReq{})

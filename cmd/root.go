@@ -18,6 +18,9 @@ import (
 
 var cfgFile string
 var address string
+var timeout int
+
+// connection details
 var conn *grpc.ClientConn
 var c pbc.ControllerClient
 
@@ -47,6 +50,10 @@ func init() {
 	// URL (including port) for peridot controller
 	rootCmd.PersistentFlags().StringVar(&address, "address", "localhost:8900", "address of peridot controller gRPC server")
 	viper.BindPFlag("address", rootCmd.PersistentFlags().Lookup("address"))
+
+	// timeout in seconds to wait for calls; 0 (default) means no timeout
+	rootCmd.PersistentFlags().IntVar(&timeout, "timeout", 0, "timeout in seconds to wait for response to calls")
+	viper.BindPFlag("timeout", rootCmd.PersistentFlags().Lookup("timeout"))
 
 	fmt.Printf("==> address is %s\n", address)
 	dialServer()
