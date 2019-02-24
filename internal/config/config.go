@@ -2,7 +2,20 @@
 
 package config
 
-import "strings"
+import (
+	"context"
+	"strings"
+	"time"
+)
+
+// GetContext gets the context and cancellation for a gRPC call.
+func GetContext(timeout int) (context.Context, context.CancelFunc) {
+	if timeout > 0 {
+		return context.WithTimeout(context.Background(), time.Second*time.Duration(timeout))
+	} else {
+		return context.WithCancel(context.Background())
+	}
+}
 
 // ExtractKVs extracts a series of semicolon-separated key:value pairs
 // into a string:string key-value mapping.

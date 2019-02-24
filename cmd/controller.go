@@ -3,14 +3,13 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	pbc "github.com/swinslow/peridot-core/pkg/controller"
+	"github.com/swinslow/peridotctl/internal/config"
 )
 
 func init() {
@@ -36,15 +35,9 @@ func init() {
 }
 
 func controllerStatus(cmd *cobra.Command, args []string) {
-	var ctx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(timeout))
-	} else {
-		ctx, cancel = context.WithCancel(context.Background())
-	}
+	ctx, cancel := config.GetContext(timeout)
 	defer cancel()
+	defer conn.Close()
 
 	resp, err := c.GetStatus(ctx, &pbc.GetStatusReq{})
 	if err != nil {
@@ -55,6 +48,4 @@ func controllerStatus(cmd *cobra.Command, args []string) {
 	fmt.Printf("health: %s\n", resp.HealthStatus.String())
 	fmt.Printf("output: %s\n", resp.OutputMsg)
 	fmt.Printf("errors: %s\n", resp.ErrorMsg)
-
-	conn.Close()
 }

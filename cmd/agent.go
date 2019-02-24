@@ -3,23 +3,15 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"time"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
 	pbc "github.com/swinslow/peridot-core/pkg/controller"
 	"github.com/swinslow/peridotctl/internal/config"
 )
-
-// vars for AddAgent
-var vAddAgentName string
-var vAddAgentURL string
-var vAddAgentPort uint32
-var vAddAgentType string
-var vAddAgentKvs string
 
 func init() {
 	var cmdAgent = &cobra.Command{
@@ -44,27 +36,33 @@ func init() {
 	var cmdAgentAdd = &cobra.Command{
 		Use:   "add",
 		Short: "Add new registered agent",
-		Long:  `Register an agent with the peridot controller.`,
-		Run:   agentAdd,
+		Long: `Register an agent with the peridot controller.
+
+Format: peridotctl agent add NAME URL PORT TYPE [CFGSTRING]
+
+	NAME:      Unique name for agent instance
+	URL:       Agent instance hostname (omitting port)
+	PORT:      Agent instance port
+	TYPE:      Agent instance type (may be repeated with other agents)
+	CFGSTRING: Optional: agent configuration values (in format key1:value1;key2:value2;...)`,
+		Args: cobra.RangeArgs(4, 5),
+		Run:  agentAdd,
 	}
 	cmdAgent.AddCommand(cmdAgentAdd)
-	cmdAgentAdd.Flags().StringVarP(&vAddAgentName, "name", "n", "", "Unique name for agent instance")
-	cmdAgentAdd.Flags().StringVarP(&vAddAgentURL, "url", "u", "localhost", "Agent instance hostname (omitting port)")
-	cmdAgentAdd.Flags().Uint32VarP(&vAddAgentPort, "port", "p", 0, "Agent instance port")
-	cmdAgentAdd.Flags().StringVarP(&vAddAgentType, "type", "t", "", "Agent instance type (may be repeated with other agents)")
-	cmdAgentAdd.Flags().StringVarP(&vAddAgentKvs, "cfg", "c", "", "Agent configuration values (in format key1:value1;key2:value2;...)")
 
+	var cmdAgentGet = &cobra.Command{
+		Use:   "get",
+		Short: "Get info on registered agent",
+		Long: `Get information about an agent that has already been
+		registered with the peridot controller.`,
+		Args: cobra.ExactArgs(1),
+		Run:  agentGet,
+	}
+	cmdAgent.AddCommand(cmdAgentGet)
 }
 
 func agentList(cmd *cobra.Command, args []string) {
-	var ctx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(timeout))
-	} else {
-		ctx, cancel = context.WithCancel(context.Background())
-	}
+	ctx, cancel := config.GetContext(timeout)
 	defer cancel()
 	defer conn.Close()
 
@@ -89,35 +87,39 @@ func agentList(cmd *cobra.Command, args []string) {
 }
 
 func agentAdd(cmd *cobra.Command, args []string) {
-	var ctx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(timeout))
-	} else {
-		ctx, cancel = context.WithCancel(context.Background())
-	}
+	ctx, cancel := config.GetContext(timeout)
 	defer cancel()
 	defer conn.Close()
 
+	name := args[0]
+	url := args[1]
+	portStr := args[2]
+	typeStr := args[3]
+	var cfgStr string
+	if len(args) == 5 {
+		cfgStr = args[4]
+	}
+
+	portInt, err := strconv.Atoi(portStr)
+	if err != nil || portInt <= 0 {
+		log.Fatalf("invalid agent port: %s", portStr)
+	}
+
 	// check whether values are okay
-	if vAddAgentName == "" {
+	if name == "" {
 		log.Fatal("no agent name specified")
 	}
 	// URL defaulting to "localhost" is acceptable, but empty string isn't
-	if vAddAgentURL == "" {
+	if url == "" {
 		log.Fatal("agent URL cannot be empty string")
 	}
-	if vAddAgentPort == 0 {
-		log.Fatal("no agent port specified")
-	}
-	if vAddAgentType == "" {
+	if typeStr == "" {
 		log.Fatal("no agent type specified")
 	}
 
 	// extract configuration key-value pairs -- semicolons separating pairs,
 	// colons separating key from value within a pair
-	cfgs := config.ExtractKVs(vAddAgentKvs)
+	cfgs := config.ExtractKVs(cfgStr)
 
 	// build into AgentKV list
 	kvs := []*pbc.AgentConfig_AgentKV{}
@@ -128,10 +130,10 @@ func agentAdd(cmd *cobra.Command, args []string) {
 
 	// build AgentConfig object
 	ac := &pbc.AgentConfig{
-		Name: vAddAgentName,
-		Url:  vAddAgentURL,
-		Port: vAddAgentPort,
-		Type: vAddAgentType,
+		Name: name,
+		Url:  url,
+		Port: uint32(portInt),
+		Type: typeStr,
 		Kvs:  kvs,
 	}
 
@@ -141,9 +143,38 @@ func agentAdd(cmd *cobra.Command, args []string) {
 	}
 
 	if resp.Success {
-		fmt.Printf("agent %s successfully registered\n", vAddAgentName)
+		fmt.Printf("agent %s successfully registered\n", name)
 	} else {
-		fmt.Printf("error registering agent %s: %s\n", vAddAgentName, resp.ErrorMsg)
+		fmt.Printf("error registering agent %s: %s\n", name, resp.ErrorMsg)
 	}
 	fmt.Printf("\n")
+}
+
+func agentGet(cmd *cobra.Command, args []string) {
+	ctx, cancel := config.GetContext(timeout)
+	defer cancel()
+	defer conn.Close()
+
+	name := args[0]
+
+	resp, err := c.GetAgent(ctx, &pbc.GetAgentReq{Name: name})
+	if err != nil {
+		log.Fatalf("could not get status for %s: %v", name, err)
+	}
+
+	if resp.Success == false {
+		log.Fatalf("agent %s not found: %s", name, resp.ErrorMsg)
+	}
+
+	agentConfig := resp.Cfg
+	fmt.Printf("name: %s\n", agentConfig.Name)
+	fmt.Printf("url: %s\n", agentConfig.Url)
+	fmt.Printf("port: %d\n", agentConfig.Port)
+	fmt.Printf("type: %s\n", agentConfig.Type)
+	fmt.Printf("Key-value configs:\n")
+	for _, kv := range agentConfig.Kvs {
+		fmt.Printf("  %s: %s\n", kv.Key, kv.Value)
+	}
+	fmt.Printf("\n")
+
 }
