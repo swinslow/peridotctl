@@ -68,7 +68,7 @@ func agentList(cmd *cobra.Command, args []string) {
 
 	resp, err := c.GetAllAgents(ctx, &pbc.GetAllAgentsReq{})
 	if err != nil {
-		log.Fatalf("could not get status: %v", err)
+		log.Fatalf("could not get agents: %v", err)
 	}
 
 	fmt.Printf("Registered agents:\n\n")
@@ -84,6 +84,7 @@ func agentList(cmd *cobra.Command, args []string) {
 		}
 		fmt.Printf("\n")
 	}
+	fmt.Printf("\n")
 }
 
 func agentAdd(cmd *cobra.Command, args []string) {
@@ -159,7 +160,7 @@ func agentGet(cmd *cobra.Command, args []string) {
 
 	resp, err := c.GetAgent(ctx, &pbc.GetAgentReq{Name: name})
 	if err != nil {
-		log.Fatalf("could not get status for %s: %v", name, err)
+		log.Fatalf("could not get agent %s: %v", name, err)
 	}
 
 	if resp.Success == false {
@@ -176,5 +177,4 @@ func agentGet(cmd *cobra.Command, args []string) {
 		fmt.Printf("  %s: %s\n", kv.Key, kv.Value)
 	}
 	fmt.Printf("\n")
-
 }
