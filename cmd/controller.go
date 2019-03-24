@@ -21,6 +21,7 @@ func init() {
 	it, and getting its current status.`,
 		Run: controllerStatus,
 	}
+	rootCmd.AddCommand(cmdController)
 
 	var cmdControllerStatus = &cobra.Command{
 		Use:   "status",
@@ -29,9 +30,16 @@ func init() {
 	error messages for the peridot controller.`,
 		Run: controllerStatus,
 	}
-
-	rootCmd.AddCommand(cmdController)
 	cmdController.AddCommand(cmdControllerStatus)
+
+	var cmdControllerStart = &cobra.Command{
+		Use:   "start",
+		Short: "Start peridot controller",
+		Long: `Try to start the peridot controller to enable it
+	to begin receiving job sets.`,
+		Run: controllerStart,
+	}
+	cmdController.AddCommand(cmdControllerStart)
 }
 
 func controllerStatus(cmd *cobra.Command, args []string) {
@@ -48,4 +56,21 @@ func controllerStatus(cmd *cobra.Command, args []string) {
 	fmt.Printf("health: %s\n", resp.HealthStatus.String())
 	fmt.Printf("output: %s\n", resp.OutputMsg)
 	fmt.Printf("errors: %s\n", resp.ErrorMsg)
+}
+
+func controllerStart(cmd *cobra.Command, args []string) {
+	ctx, cancel := config.GetContext(timeout)
+	defer cancel()
+	defer conn.Close()
+
+	resp, err := c.Start(ctx, &pbc.StartReq{})
+	if err != nil {
+		log.Fatalf("could not start controller: %v", err)
+	}
+
+	if resp.Starting {
+		fmt.Printf("controller is starting\n")
+	} else {
+		log.Fatalf("could not start controller: %v", resp.ErrorMsg)
+	}
 }

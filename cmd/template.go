@@ -11,6 +11,7 @@ import (
 
 	pbc "github.com/swinslow/peridot-core/pkg/controller"
 	"github.com/swinslow/peridotctl/internal/config"
+	"github.com/swinslow/peridotctl/internal/outputfmt"
 )
 
 func init() {
@@ -49,35 +50,7 @@ func templateList(cmd *cobra.Command, args []string) {
 	for _, jst := range resp.Jsts {
 		fmt.Printf("  - name: %s\n", jst.Name)
 		fmt.Printf("    steps:\n")
-		fmt.Println(strings.Join(convertSteps(jst.Steps, 4), "\n"))
+		fmt.Println(strings.Join(outputfmt.ConvertStepTemplates(jst.Steps, 4), "\n"))
 	}
 	fmt.Printf("\n")
-}
-
-func convertSteps(steps []*pbc.StepTemplate, indent int) []string {
-	lines := []string{}
-
-	for _, step := range steps {
-		switch x := step.S.(type) {
-		case *pbc.StepTemplate_Agent:
-			line1 := fmt.Sprintf("%s  - type: agent", strings.Repeat(" ", indent))
-			line2 := fmt.Sprintf("%s    name: %s", strings.Repeat(" ", indent), x.Agent.Name)
-			lines = append(lines, line1)
-			lines = append(lines, line2)
-		case *pbc.StepTemplate_Jobset:
-			line1 := fmt.Sprintf("%s  - type: jobset", strings.Repeat(" ", indent))
-			line2 := fmt.Sprintf("%s    name: %s", strings.Repeat(" ", indent), x.Jobset.Name)
-			lines = append(lines, line1)
-			lines = append(lines, line2)
-		case *pbc.StepTemplate_Concurrent:
-			line1 := fmt.Sprintf("%s  - type: concurrent", strings.Repeat(" ", indent))
-			line2 := fmt.Sprintf("%s    steps:", strings.Repeat(" ", indent))
-			subStepLines := convertSteps(x.Concurrent.Steps, indent+4)
-			lines = append(lines, line1)
-			lines = append(lines, line2)
-			lines = append(lines, subStepLines...)
-		}
-	}
-
-	return lines
 }
